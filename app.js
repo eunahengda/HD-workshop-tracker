@@ -205,6 +205,9 @@ function App() {
       quotedPrice: form.get("quotedPrice"),
       driver: form.get("driver"),
       deliveryDatetime: form.get("deliveryDatetime"),
+      quotationNo: form.get("quotationNo"),
+      poNo: form.get("poNo"),
+      doNo: form.get("doNo"),
       remark: form.get("remark")
     };
     await runAction(async () => {
@@ -244,6 +247,9 @@ function App() {
       quotedPrice: form.get("quotedPrice"),
       driver: form.get("driver"),
       deliveryDatetime: form.get("deliveryDatetime"),
+      quotationNo: form.get("quotationNo"),
+      poNo: form.get("poNo"),
+      doNo: form.get("doNo"),
       remark: form.get("remark")
     }), "Work order updated");
   }
@@ -310,7 +316,7 @@ function Header({ profile, onSignOut }) {
     React.createElement("div", { className: "topbar-title" },
       React.createElement("div", { className: "mini-mark" }, "H&D"),
       React.createElement("div", null,
-        React.createElement("strong", null, "Workshop Operations"),
+        React.createElement("strong", null, "H&D Hengda Record"),
         React.createElement("span", null, "Supabase realtime operations workflow")
       )
     ),
@@ -481,7 +487,7 @@ function OrderCard({ order, setSelectedId, setPage }) {
       order.qty !== "" && React.createElement("span", null, `Qty: ${order.qty}`),
       order.size && React.createElement("span", null, `Size: ${order.size}`),
       order.sample && React.createElement("span", null, `Sample: ${order.sample}`),
-      React.createElement("span", null, `Due ${fmtDate(order.dueDate)}`)
+      order.orderDate && React.createElement("span", null, fmtDate(order.orderDate))
     )
   );
 }
@@ -493,15 +499,17 @@ function CreateOrder({ data, createOrder }) {
       panel("Job Details",
         field("Client name", "customer", "text", "", true, data.customers.map(customer => customer.name)),
         field("Order date", "orderDate", "date", new Date().toISOString().slice(0, 10)),
-        optionalSelect("Repair / Make", "jobCategory", JOB_CATEGORIES),
+        checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, [], false),
         checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES),
         field("QTY", "qty", "number"),
-        textarea("Description", "description"),
+        textarea("Part Name", "description"),
         field("Material", "material"),
         field("Size", "size"),
-        field("Sample (quantity or \"No\")", "sample"),
-        optionalSelect("Urgent", "urgent", ["Yes", "No"], "No"),
-        field("Due date", "dueDate", "date"),
+        React.createElement(SampleField, {}),
+        React.createElement("label", { className: "checkbox-option urgent-check" },
+          React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes" }),
+          React.createElement("span", null, "Urgent")
+        ),
         React.createElement("div", { className: "field full-span" },
           React.createElement("label", null, "Photos"),
           React.createElement("input", { type: "file", name: "photos", accept: "image/*", multiple: true })
@@ -527,6 +535,14 @@ function CreateOrder({ data, createOrder }) {
         React.createElement("div", { className: "collapsible-body" },
           field("Driver (name or \"Client pick-up\")", "driver"),
           field("Delivery date & time", "deliveryDatetime", "datetime-local")
+        )
+      ),
+      React.createElement("details", { className: "panel collapsible" },
+        React.createElement("summary", null, "Documentation"),
+        React.createElement("div", { className: "collapsible-body" },
+          field("Quotation No.", "quotationNo"),
+          field("P.O. No.", "poNo"),
+          field("D.O. No.", "doNo")
         )
       ),
       panel("Remark",
@@ -583,8 +599,7 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
         React.createElement("div", { className: "detail-meta" },
           order.qty !== "" && React.createElement("span", null, `Qty: ${order.qty}`),
           order.size && React.createElement("span", null, `Size: ${order.size}`),
-          order.sample && React.createElement("span", null, `Sample: ${order.sample}`),
-          React.createElement("span", null, `Due ${fmtDate(order.dueDate)}`)
+          order.sample && React.createElement("span", null, `Sample: ${order.sample}`)
         ),
         order.remark && React.createElement("p", { className: "subtitle" }, `Remark: ${order.remark}`),
         React.createElement("div", { className: "image-grid" },
@@ -616,16 +631,18 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
         React.createElement("form", { className: "module-form compact", onSubmit: event => updateOrder(event, order), key: order.id },
           field("Client name", "customer", "text", order.customer, true, data.customers.map(customer => customer.name)),
           field("Order date", "orderDate", "date", order.orderDate),
-          optionalSelect("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory),
+          checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory ? [order.jobCategory] : [], false),
           checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES, order.workTypes),
           field("QTY", "qty", "number", order.qty),
           field("Material", "material", "text", order.material),
           field("Size", "size", "text", order.size),
-          field("Sample (quantity or \"No\")", "sample", "text", order.sample),
-          optionalSelect("Urgent", "urgent", ["Yes", "No"], order.urgent ? "Yes" : "No"),
-          field("Due date", "dueDate", "date", order.dueDate),
+          React.createElement(SampleField, { initial: order.sample, key: `sample-${order.id}` }),
+          React.createElement("label", { className: "checkbox-option urgent-check" },
+            React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes", defaultChecked: order.urgent }),
+            React.createElement("span", null, "Urgent")
+          ),
           React.createElement("div", { className: "field full-span" },
-            React.createElement("label", null, "Description"),
+            React.createElement("label", null, "Part Name"),
             React.createElement("textarea", { name: "description", defaultValue: order.description })
           ),
           React.createElement("div", { className: "field full-span" },
@@ -652,6 +669,14 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
             React.createElement("div", { className: "collapsible-body" },
               field("Driver (name or \"Client pick-up\")", "driver", "text", order.driver),
               field("Delivery date & time", "deliveryDatetime", "datetime-local", order.deliveryDatetime ? order.deliveryDatetime.slice(0, 16) : "")
+            )
+          ),
+          React.createElement("details", { className: "collapsible nested" },
+            React.createElement("summary", null, "Documentation"),
+            React.createElement("div", { className: "collapsible-body" },
+              field("Quotation No.", "quotationNo", "text", order.quotationNo),
+              field("P.O. No.", "poNo", "text", order.poNo),
+              field("D.O. No.", "doNo", "text", order.doNo)
             )
           ),
           React.createElement("button", { className: "btn", type: "submit" }, "Update Work Order")
@@ -685,16 +710,29 @@ function Customers(props) {
     runAction: props.runAction,
     fields: [
       ["name", "Customer name", "text", true],
+      ["companyFullName", "Company full name"],
       ["contact", "Contact person"],
       ["phone", "Phone"],
       ["email", "Email", "email"],
-      ["industry", "Industry"]
+      ["industry", "Industry"],
+      ["ssmNumber", "SSM number"],
+      ["sstNumber", "SST number"],
+      ["tinNumber", "TIN number"]
     ],
     renderLines: item => {
       const orders = props.data.orders.filter(order => order.customer === item.name);
       const total = orders.reduce((sum, order) => sum + Number(order.quotedPrice || 0), 0);
       const lastOrder = orders.map(order => order.dueDate).sort().pop();
-      return [`Contact: ${item.contact || "None"}`, `Phone: ${item.phone || "None"}`, `Email: ${item.email || "None"}`, `Industry: ${item.industry || "None"}`, `Last order: ${lastOrder ? fmtDate(lastOrder) : "None"}`, `Total sales: ${money(total)}`];
+      return [
+        `Company: ${item.companyFullName || "None"}`,
+        `Contact: ${item.contact || "None"}`,
+        `Phone: ${item.phone || "None"}`,
+        `Email: ${item.email || "None"}`,
+        `Industry: ${item.industry || "None"}`,
+        `SSM: ${item.ssmNumber || "None"} - SST: ${item.sstNumber || "None"} - TIN: ${item.tinNumber || "None"}`,
+        `Last order: ${lastOrder ? fmtDate(lastOrder) : "None"}`,
+        `Total sales: ${money(total)}`
+      ];
     },
     badge: item => item.industry || "Customer"
   });
@@ -830,15 +868,45 @@ function optionalSelect(label, name, options, selected = "") {
   );
 }
 
-function checkboxGroup(label, name, options, selectedValues = []) {
+function checkboxGroup(label, name, options, selectedValues = [], multiple = true) {
+  const values = Array.isArray(selectedValues) ? selectedValues : [selectedValues].filter(Boolean);
   return React.createElement("div", { className: "field full-span" },
-    React.createElement("label", null, label),
+    label && React.createElement("label", null, label),
     React.createElement("div", { className: "checkbox-group" },
       ...options.map(option => React.createElement("label", { key: option, className: "checkbox-option" },
-        React.createElement("input", { type: "checkbox", name, value: option, defaultChecked: selectedValues.includes(option) }),
+        React.createElement("input", { type: multiple ? "checkbox" : "radio", name, value: option, defaultChecked: values.includes(option) }),
         React.createElement("span", null, option)
       ))
     )
+  );
+}
+
+function SampleField({ initial = "" }) {
+  const startsAsNo = initial === "" || initial === "No" || initial === "no";
+  const [mode, setMode] = useState(startsAsNo ? "no" : "qty");
+  const [qty, setQty] = useState(startsAsNo ? "" : initial);
+  return React.createElement("div", { className: "field" },
+    React.createElement("label", null, "Sample"),
+    React.createElement("div", { className: "sample-toggle" },
+      React.createElement("label", { className: `checkbox-option ${mode === "no" ? "active" : ""}` },
+        React.createElement("input", {
+          type: "radio",
+          name: "sampleMode",
+          checked: mode === "no",
+          onChange: () => { setMode("no"); setQty(""); }
+        }),
+        React.createElement("span", null, "No")
+      ),
+      React.createElement("input", {
+        type: "number",
+        min: "0",
+        placeholder: "Qty",
+        value: qty,
+        onFocus: () => setMode("qty"),
+        onChange: event => { setQty(event.target.value); setMode("qty"); }
+      })
+    ),
+    React.createElement("input", { type: "hidden", name: "sample", value: mode === "no" ? "No" : qty, readOnly: true })
   );
 }
 

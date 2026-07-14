@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+html {
+  font-size: 18px;
+}
+
 body {
   margin: 0;
   color: var(--ink);
@@ -332,6 +336,29 @@ main {
 .static-card {
   cursor: default;
   touch-action: manipulation;
+}
+
+.checkbox-option.active {
+  border-color: var(--brand);
+  background: #eaf1fb;
+  color: var(--brand-dark);
+}
+
+.sample-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sample-toggle input[type="number"] {
+  max-width: 120px;
+}
+
+.urgent-check {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 4px;
 }
 
 .card-thumb {

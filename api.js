@@ -4,7 +4,7 @@ export { isSupabaseConfigured };
 
 export const STATUSES = ["New Order", "Material Ordering", "Machining", "Ready To Deliver", "Delivered"];
 export const WORK_TYPES = ["Lathe", "Turning", "Milling", "Welding", "Repair Works"];
-export const JOB_WORK_TYPES = ["Lathe", "Milling", "Welding"];
+export const JOB_WORK_TYPES = ["Lathe", "Milling", "Welding", "Internal", "Grind", "Drill", "Tap Thread", "Shaping/Mill Keyway"];
 export const JOB_CATEGORIES = ["Repair", "Make"];
 export const PRIORITIES = ["Medium", "High", "Low"];
 export const STORAGE_BUCKET = "work-order-images";
@@ -107,6 +107,15 @@ export function subscribeToRealtime(onChange) {
 
 export async function loadWorkshopData() {
   const client = requireSupabase();
+  const safe = async (label, promise, fallback) => {
+    try {
+      return await run(promise);
+    } catch (error) {
+      console.error(`Failed to load ${label}:`, error.message);
+      return fallback;
+    }
+  };
+
   const [
     customers,
     suppliers,
@@ -118,22 +127,26 @@ export async function loadWorkshopData() {
     images,
     profiles
   ] = await Promise.all([
-    run(client.from("customers").select("*").order("name")),
-    run(client.from("suppliers").select("*").order("name")),
-    run(client.from("workers").select("*").order("name")),
-    run(client.from("quote_history").select("*").order("quote_date", { ascending: false })),
-    run(client.from("repair_case_library").select("*").order("problem")),
-    run(client.from("work_orders").select("*").order("created_at", { ascending: false })),
-    run(client.from("work_order_status_history").select("*").order("created_at", { ascending: true })),
-    run(client.from("work_order_images").select("*").order("created_at", { ascending: true })),
-    run(client.from("profiles").select("*"))
+    safe("customers", client.from("customers").select("*").order("name"), []),
+    safe("suppliers", client.from("suppliers").select("*").order("name"), []),
+    safe("workers", client.from("workers").select("*").order("name"), []),
+    safe("quotes", client.from("quote_history").select("*").order("quote_date", { ascending: false }), []),
+    safe("repairs", client.from("repair_case_library").select("*").order("problem"), []),
+    safe("orders", client.from("work_orders").select("*").order("created_at", { ascending: false }), []),
+    safe("status history", client.from("work_order_status_history").select("*").order("created_at", { ascending: true }), []),
+    safe("images", client.from("work_order_images").select("*").order("created_at", { ascending: true }), []),
+    safe("profiles", client.from("profiles").select("*"), [])
   ]);
 
   const profileMap = new Map(profiles.map(profile => [profile.id, profile.full_name || profile.email]));
-  const signedImages = await Promise.all(images.map(async image => ({
-    ...image,
-    signed_url: await createImageUrl(image.image_url)
-  })));
+  const signedImages = await Promise.all(images.map(async image => {
+    try {
+      return { ...image, signed_url: await createImageUrl(image.image_url) };
+    } catch (error) {
+      console.error("Failed to sign image URL:", error.message);
+      return { ...image, signed_url: null };
+    }
+  }));
 
   return {
     customers: customers.map(mapCustomer),
@@ -237,7 +250,11 @@ function mapCustomer(row) {
     contact: row.contact_person || "",
     phone: row.phone || "",
     email: row.email || "",
-    industry: row.industry || ""
+    industry: row.industry || "",
+    companyFullName: row.company_full_name || "",
+    ssmNumber: row.ssm_number || "",
+    sstNumber: row.sst_number || "",
+    tinNumber: row.tin_number || ""
   };
 }
 
@@ -247,7 +264,11 @@ function customerToRow(record) {
     contact_person: record.contact,
     phone: record.phone,
     email: record.email,
-    industry: record.industry
+    industry: record.industry,
+    company_full_name: record.companyFullName || null,
+    ssm_number: record.ssmNumber || null,
+    sst_number: record.sstNumber || null,
+    tin_number: record.tinNumber || null
   };
 }
 
@@ -369,6 +390,9 @@ function mapOrder(row, history, images, profileMap = new Map()) {
     supplierQty: row.supplier_qty === null || row.supplier_qty === undefined ? "" : Number(row.supplier_qty),
     driver: row.driver || "",
     deliveryDatetime: row.delivery_datetime || "",
+    quotationNo: row.quotation_no || "",
+    poNo: row.po_no || "",
+    doNo: row.do_no || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     createdBy: row.created_by,
@@ -411,7 +435,10 @@ function orderToRow(record) {
     supplier_size: record.supplierSize || null,
     supplier_qty: record.supplierQty === "" || record.supplierQty === undefined || record.supplierQty === null ? null : Number(record.supplierQty),
     driver: record.driver || null,
-    delivery_datetime: record.deliveryDatetime || null
+    delivery_datetime: record.deliveryDatetime || null,
+    quotation_no: record.quotationNo || null,
+    po_no: record.poNo || null,
+    do_no: record.doNo || null
   };
 }
 
