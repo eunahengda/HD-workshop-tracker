@@ -300,7 +300,8 @@ function mapWorker(row) {
     role: row.role,
     skills: row.skills || "",
     status: row.status || "Available",
-    activeOrderId: row.active_order_id || ""
+    activeOrderId: row.active_order_id || "",
+    dateOfBirth: row.date_of_birth || ""
   };
 }
 
@@ -310,7 +311,8 @@ function workerToRow(record) {
     role: record.role,
     skills: record.skills,
     status: record.status,
-    active_order_id: record.activeOrderId || null
+    active_order_id: record.activeOrderId || null,
+    date_of_birth: record.dateOfBirth || null
   };
 }
 

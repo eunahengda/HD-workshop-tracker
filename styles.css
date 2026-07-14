@@ -361,13 +361,57 @@ main {
   margin-top: 4px;
 }
 
+.card-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.card-qty {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+.card-meta-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.card-date {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sort-control {
+  max-width: 260px;
+  margin-bottom: 10px;
+}
+
 .card-thumb {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .card-thumb {
+    width: 96px;
+    height: 96px;
+  }
 }
 
 .urgent-pill {

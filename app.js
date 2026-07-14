@@ -475,19 +475,19 @@ function OrderCard({ order, setSelectedId, setPage }) {
     ...listeners,
     ...attributes
   },
-    React.createElement("div", { className: "card-top" },
-      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" }),
-      React.createElement("div", null,
+    React.createElement("div", { className: "card-row" },
+      React.createElement("div", { className: "card-info" },
         React.createElement("div", { className: "order-no" }, order.orderNo),
-        React.createElement("div", { className: "card-title" }, order.customer)
+        React.createElement("div", { className: "card-title" }, order.customer),
+        order.qty !== "" && React.createElement("div", { className: "card-qty" }, `Qty: ${order.qty}`)
       ),
-      order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent")
+      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" })
     ),
     React.createElement("div", { className: "card-meta" },
-      order.qty !== "" && React.createElement("span", null, `Qty: ${order.qty}`),
-      order.size && React.createElement("span", null, `Size: ${order.size}`),
-      order.sample && React.createElement("span", null, `Sample: ${order.sample}`),
-      order.orderDate && React.createElement("span", null, fmtDate(order.orderDate))
+      React.createElement("div", { className: "card-meta-left" },
+        order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
+        order.orderDate && React.createElement("span", { className: "card-date" }, fmtDate(order.orderDate))
+      )
     )
   );
 }
@@ -703,11 +703,22 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
 }
 
 function Customers(props) {
+  const rows = props.data.customers.map(item => {
+    const orders = props.data.orders.filter(order => order.customer === item.name);
+    const total = orders.reduce((sum, order) => sum + Number(order.quotedPrice || 0), 0);
+    const lastOrder = orders.map(order => order.orderDate).filter(Boolean).sort().pop() || "";
+    return { ...item, _lastOrder: lastOrder, _totalSales: total };
+  });
   return React.createElement(CrudModule, {
     title: "Customer Management",
     api: customersApi,
-    rows: props.data.customers,
+    rows,
     runAction: props.runAction,
+    sortOptions: [
+      { key: "az", label: "Name (A-Z)", compare: (a, b) => a.name.localeCompare(b.name) },
+      { key: "lastOrder", label: "Last order date", compare: (a, b) => b._lastOrder.localeCompare(a._lastOrder) },
+      { key: "sales", label: "Total sales", compare: (a, b) => b._totalSales - a._totalSales }
+    ],
     fields: [
       ["name", "Customer name", "text", true],
       ["companyFullName", "Company full name"],
@@ -719,21 +730,16 @@ function Customers(props) {
       ["sstNumber", "SST number"],
       ["tinNumber", "TIN number"]
     ],
-    renderLines: item => {
-      const orders = props.data.orders.filter(order => order.customer === item.name);
-      const total = orders.reduce((sum, order) => sum + Number(order.quotedPrice || 0), 0);
-      const lastOrder = orders.map(order => order.dueDate).sort().pop();
-      return [
-        `Company: ${item.companyFullName || "None"}`,
-        `Contact: ${item.contact || "None"}`,
-        `Phone: ${item.phone || "None"}`,
-        `Email: ${item.email || "None"}`,
-        `Industry: ${item.industry || "None"}`,
-        `SSM: ${item.ssmNumber || "None"} - SST: ${item.sstNumber || "None"} - TIN: ${item.tinNumber || "None"}`,
-        `Last order: ${lastOrder ? fmtDate(lastOrder) : "None"}`,
-        `Total sales: ${money(total)}`
-      ];
-    },
+    renderLines: item => [
+      `Company: ${item.companyFullName || "None"}`,
+      `Contact: ${item.contact || "None"}`,
+      `Phone: ${item.phone || "None"}`,
+      `Email: ${item.email || "None"}`,
+      `Industry: ${item.industry || "None"}`,
+      `SSM: ${item.ssmNumber || "None"} - SST: ${item.sstNumber || "None"} - TIN: ${item.tinNumber || "None"}`,
+      `Last order: ${item._lastOrder ? fmtDate(item._lastOrder) : "None"}`,
+      `Total sales: ${money(item._totalSales)}`
+    ],
     badge: item => item.industry || "Customer"
   });
 }
@@ -756,10 +762,21 @@ function Workers(props) {
     api: workersApi,
     rows: props.data.workers,
     runAction: props.runAction,
-    fields: [["name", "Worker name", "text", true], ["role", "Role", "text", true], ["skills", "Skills"], ["status", "Status"], ["activeOrderId", "Active work order ID"]],
-    renderLines: item => [`Role: ${item.role}`, `Skills: ${item.skills || "None"}`, `Active order: ${item.activeOrderId || "None"}`],
+    fields: [["name", "Worker name", "text", true], ["role", "Role", "text", true], ["dateOfBirth", "Date of birth", "date"], ["skills", "Skills"], ["status", "Status"], ["activeOrderId", "Active work order ID"]],
+    renderLines: item => [`Role: ${item.role}`, `Age: ${calculateAge(item.dateOfBirth)}`, `Skills: ${item.skills || "None"}`, `Active order: ${item.activeOrderId || "None"}`],
     badge: item => item.status || "Available"
   });
+}
+
+function calculateAge(dateOfBirth) {
+  if (!dateOfBirth) return "Unknown";
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return "Unknown";
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const hasHadBirthdayThisYear = (today.getMonth() > dob.getMonth()) || (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age;
 }
 
 function Quotes(props) {
@@ -788,10 +805,13 @@ function Repairs(props) {
   });
 }
 
-function CrudModule({ title, api, rows, fields, renderLines, badge, heading, runAction }) {
+function CrudModule({ title, api, rows, fields, renderLines, badge, heading, runAction, sortOptions }) {
   const [editing, setEditing] = useState(null);
+  const [sortKey, setSortKey] = useState(sortOptions?.[0]?.key || "");
   const blank = Object.fromEntries(fields.map(([name]) => [name, ""]));
   const active = editing || blank;
+  const activeSort = sortOptions?.find(option => option.key === sortKey);
+  const sortedRows = activeSort ? [...rows].sort(activeSort.compare) : rows;
 
   async function submit(event) {
     event.preventDefault();
@@ -817,8 +837,14 @@ function CrudModule({ title, api, rows, fields, renderLines, badge, heading, run
         editing?.id && React.createElement("button", { className: "btn secondary", type: "button", onClick: () => setEditing(null) }, "Cancel")
       )
     ),
+    sortOptions && React.createElement("div", { className: "field sort-control" },
+      React.createElement("label", null, "Sort by"),
+      React.createElement("select", { value: sortKey, onChange: event => setSortKey(event.target.value) },
+        ...sortOptions.map(option => React.createElement("option", { key: option.key, value: option.key }, option.label))
+      )
+    ),
     React.createElement("section", { className: "cards module-list" },
-      ...rows.map(item => React.createElement("article", { key: item.id, className: "order-card static-card" },
+      ...sortedRows.map(item => React.createElement("article", { key: item.id, className: "order-card static-card" },
         React.createElement("div", { className: "card-top" },
           React.createElement("div", { className: "card-title" }, heading ? heading(item) : item.name),
           React.createElement("span", { className: "status-pill" }, badge(item))
@@ -829,7 +855,7 @@ function CrudModule({ title, api, rows, fields, renderLines, badge, heading, run
           React.createElement("button", { className: "btn danger", type: "button", onClick: () => runAction(() => api.remove(item.id), `${title} deleted`) }, "Delete")
         )
       )),
-      !rows.length && React.createElement("div", { className: "panel empty" }, "No records yet.")
+      !sortedRows.length && React.createElement("div", { className: "panel empty" }, "No records yet.")
     )
   );
 }
