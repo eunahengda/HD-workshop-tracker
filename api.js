@@ -4,6 +4,8 @@ export { isSupabaseConfigured };
 
 export const STATUSES = ["New Order", "Material Ordering", "Machining", "Ready To Deliver", "Delivered"];
 export const WORK_TYPES = ["Lathe", "Turning", "Milling", "Welding", "Repair Works"];
+export const JOB_WORK_TYPES = ["Lathe", "Milling", "Welding"];
+export const JOB_CATEGORIES = ["Repair", "Make"];
 export const PRIORITIES = ["Medium", "High", "Low"];
 export const STORAGE_BUCKET = "work-order-images";
 
@@ -341,17 +343,32 @@ function mapOrder(row, history, images, profileMap = new Map()) {
     orderNo: row.order_no,
     customer: row.customer,
     phone: row.phone || "",
-    title: row.title,
-    workType: row.work_type,
-    description: row.description,
+    title: row.title || "",
+    workType: row.work_type || "",
+    description: row.description || "",
     status: row.status,
-    priority: row.priority,
+    priority: row.priority || "",
     dueDate: row.due_date,
     deliveryAddress: row.delivery_address || "",
     materialCost: Number(row.material_cost || 0),
     laborCost: Number(row.labor_cost || 0),
     otherCost: Number(row.other_cost || 0),
     quotedPrice: Number(row.quoted_price || 0),
+    orderDate: row.order_date || "",
+    jobCategory: row.job_category || "",
+    workTypes: Array.isArray(row.work_types) ? row.work_types : [],
+    qty: row.qty === null || row.qty === undefined ? "" : Number(row.qty),
+    material: row.material || "",
+    size: row.size || "",
+    sample: row.sample || "",
+    urgent: Boolean(row.urgent),
+    remark: row.remark || "",
+    supplierName: row.supplier_name || "",
+    supplierMaterial: row.supplier_material || "",
+    supplierSize: row.supplier_size || "",
+    supplierQty: row.supplier_qty === null || row.supplier_qty === undefined ? "" : Number(row.supplier_qty),
+    driver: row.driver || "",
+    deliveryDatetime: row.delivery_datetime || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     createdBy: row.created_by,
@@ -365,20 +382,36 @@ function mapOrder(row, history, images, profileMap = new Map()) {
 
 function orderToRow(record) {
   return {
-    order_no: record.orderNo,
+    // order_no is intentionally omitted on create - the database trigger
+    // assigns it automatically (format YYMM-NNN, resets each month).
     customer: record.customer,
-    phone: record.phone,
-    title: record.title,
-    work_type: record.workType,
-    description: record.description,
+    phone: record.phone || null,
+    title: record.title || null,
+    work_type: record.workType || null,
+    description: record.description || null,
     status: record.status,
-    priority: record.priority,
-    due_date: record.dueDate,
-    delivery_address: record.deliveryAddress,
+    priority: record.priority || null,
+    due_date: record.dueDate || null,
+    delivery_address: record.deliveryAddress || null,
     material_cost: Number(record.materialCost || 0),
     labor_cost: Number(record.laborCost || 0),
     other_cost: Number(record.otherCost || 0),
-    quoted_price: Number(record.quotedPrice || 0)
+    quoted_price: Number(record.quotedPrice || 0),
+    order_date: record.orderDate || new Date().toISOString().slice(0, 10),
+    job_category: record.jobCategory || null,
+    work_types: Array.isArray(record.workTypes) ? record.workTypes : [],
+    qty: record.qty === "" || record.qty === undefined || record.qty === null ? null : Number(record.qty),
+    material: record.material || null,
+    size: record.size || null,
+    sample: record.sample || null,
+    urgent: Boolean(record.urgent),
+    remark: record.remark || null,
+    supplier_name: record.supplierName || null,
+    supplier_material: record.supplierMaterial || null,
+    supplier_size: record.supplierSize || null,
+    supplier_qty: record.supplierQty === "" || record.supplierQty === undefined || record.supplierQty === null ? null : Number(record.supplierQty),
+    driver: record.driver || null,
+    delivery_datetime: record.deliveryDatetime || null
   };
 }
 

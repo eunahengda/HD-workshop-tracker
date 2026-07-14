@@ -4,8 +4,8 @@
   --line: #d9e0e8;
   --panel: #ffffff;
   --paper: #f6f7f9;
-  --brand: #0d7468;
-  --brand-dark: #07554d;
+  --brand: #0047ab;
+  --brand-dark: #003380;
   --accent: #c84b31;
   --warn: #b7791f;
   --ok: #13795b;
@@ -332,6 +332,94 @@ main {
 .static-card {
   cursor: default;
   touch-action: manipulation;
+}
+
+.card-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.urgent-pill {
+  background: #fdecea;
+  border-color: #f2b8a2;
+  color: #b02a1a;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  background: var(--panel);
+}
+
+.checkbox-option input {
+  width: auto;
+}
+
+.computed-value {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 800;
+  color: var(--brand-dark);
+  background: var(--paper);
+}
+
+details.collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+details.collapsible > summary {
+  padding: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  list-style: none;
+}
+
+details.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.collapsible > summary::before {
+  content: "▸ ";
+  color: var(--brand);
+}
+
+details.collapsible[open] > summary::before {
+  content: "▾ ";
+}
+
+details.collapsible .collapsible-body {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+details.collapsible.nested {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.field.full-span details.collapsible.nested,
+.module-form details.collapsible.nested {
+  grid-column: 1 / -1;
 }
 
 .card-top,

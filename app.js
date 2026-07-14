@@ -11,6 +11,8 @@ import {
   useSensors
 } from "@dnd-kit/core";
 import {
+  JOB_CATEGORIES,
+  JOB_WORK_TYPES,
   PRIORITIES,
   STATUSES,
   WORK_TYPES,
@@ -180,25 +182,34 @@ function App() {
   async function createOrder(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const status = form.get("status");
+    const photos = form.getAll("photos").filter(file => file instanceof File && file.size > 0);
     const order = {
-      orderNo: `HD-${new Date().getFullYear()}-${String(data.orders.length + 1).padStart(3, "0")}`,
       customer: form.get("customer"),
-      phone: form.get("phone"),
-      title: form.get("title"),
-      workType: form.get("workType"),
+      orderDate: form.get("orderDate"),
+      jobCategory: form.get("jobCategory"),
+      workTypes: form.getAll("workTypes"),
+      qty: form.get("qty"),
       description: form.get("description"),
-      status,
-      priority: form.get("priority"),
+      material: form.get("material"),
+      size: form.get("size"),
+      sample: form.get("sample"),
+      urgent: form.get("urgent") === "Yes",
+      status: "New Order",
       dueDate: form.get("dueDate"),
-      deliveryAddress: form.get("deliveryAddress"),
+      supplierName: form.get("supplierName"),
+      supplierMaterial: form.get("supplierMaterial"),
+      supplierSize: form.get("supplierSize"),
+      supplierQty: form.get("supplierQty"),
       materialCost: form.get("materialCost"),
       laborCost: form.get("laborCost"),
-      otherCost: form.get("otherCost"),
-      quotedPrice: form.get("quotedPrice")
+      quotedPrice: form.get("quotedPrice"),
+      driver: form.get("driver"),
+      deliveryDatetime: form.get("deliveryDatetime"),
+      remark: form.get("remark")
     };
     await runAction(async () => {
       const id = await workOrdersApi.create(order);
+      if (photos.length) await workOrdersApi.uploadImages(id, photos);
       setSelectedId(id);
       setPage("detail");
     }, "Work order created");
@@ -214,17 +225,26 @@ function App() {
     await runAction(() => workOrdersApi.update(order.id, {
       ...order,
       customer: form.get("customer"),
-      phone: form.get("phone"),
-      title: form.get("title"),
-      workType: form.get("workType"),
+      orderDate: form.get("orderDate"),
+      jobCategory: form.get("jobCategory"),
+      workTypes: form.getAll("workTypes"),
+      qty: form.get("qty"),
       description: form.get("description"),
-      priority: form.get("priority"),
+      material: form.get("material"),
+      size: form.get("size"),
+      sample: form.get("sample"),
+      urgent: form.get("urgent") === "Yes",
       dueDate: form.get("dueDate"),
-      deliveryAddress: form.get("deliveryAddress"),
+      supplierName: form.get("supplierName"),
+      supplierMaterial: form.get("supplierMaterial"),
+      supplierSize: form.get("supplierSize"),
+      supplierQty: form.get("supplierQty"),
       materialCost: form.get("materialCost"),
       laborCost: form.get("laborCost"),
-      otherCost: form.get("otherCost"),
-      quotedPrice: form.get("quotedPrice")
+      quotedPrice: form.get("quotedPrice"),
+      driver: form.get("driver"),
+      deliveryDatetime: form.get("deliveryDatetime"),
+      remark: form.get("remark")
     }), "Work order updated");
   }
 
@@ -397,7 +417,7 @@ function Kanban({ data, search, moveOrder, setSelectedId, setPage }) {
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 6 } })
   );
   const query = search.trim().toLowerCase();
-  const orders = data.orders.filter(order => [order.orderNo, order.customer, order.title, order.workType].join(" ").toLowerCase().includes(query));
+  const orders = data.orders.filter(order => [order.orderNo, order.customer, order.material, order.size, ...(order.workTypes || [])].join(" ").toLowerCase().includes(query));
 
   return React.createElement(DndContext, {
     sensors,
@@ -435,6 +455,7 @@ function KanbanColumn({ status, orders, setSelectedId, setPage }) {
 function OrderCard({ order, setSelectedId, setPage }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: order.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 20 } : undefined;
+  const thumbnail = (order.images || [])[0];
   return React.createElement("button", {
     ref: setNodeRef,
     style,
@@ -449,42 +470,94 @@ function OrderCard({ order, setSelectedId, setPage }) {
     ...attributes
   },
     React.createElement("div", { className: "card-top" },
+      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" }),
       React.createElement("div", null,
         React.createElement("div", { className: "order-no" }, order.orderNo),
-        React.createElement("div", { className: "card-title" }, order.title)
+        React.createElement("div", { className: "card-title" }, order.customer)
       ),
-      React.createElement("span", { className: "status-pill" }, order.priority)
+      order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent")
     ),
     React.createElement("div", { className: "card-meta" },
-      React.createElement("span", null, `${order.customer} - ${order.workType}`),
-      React.createElement("span", null, `Due ${fmtDate(order.dueDate)}`),
-      React.createElement("span", { className: "money" }, `${money(profit(order))} profit`)
+      order.qty !== "" && React.createElement("span", null, `Qty: ${order.qty}`),
+      order.size && React.createElement("span", null, `Size: ${order.size}`),
+      order.sample && React.createElement("span", null, `Sample: ${order.sample}`),
+      React.createElement("span", null, `Due ${fmtDate(order.dueDate)}`)
     )
   );
 }
 
 function CreateOrder({ data, createOrder }) {
   return React.createElement(React.Fragment, null,
-    pageHead("Create Work Order", "Capture job scope, costs, and delivery target."),
+    pageHead("Create Work Order", "Only client name is required - fill in the rest as it becomes available."),
     React.createElement("form", { className: "form-grid", onSubmit: createOrder },
       panel("Job Details",
-        field("Customer name", "customer", "text", "", true, data.customers.map(customer => customer.name)),
-        field("Phone", "phone", "tel"),
-        field("Work title", "title", "text", "", true),
-        select("Work type", "workType", WORK_TYPES),
-        select("Priority", "priority", PRIORITIES),
-        textarea("Description", "description", true)
+        field("Client name", "customer", "text", "", true, data.customers.map(customer => customer.name)),
+        field("Order date", "orderDate", "date", new Date().toISOString().slice(0, 10)),
+        optionalSelect("Repair / Make", "jobCategory", JOB_CATEGORIES),
+        checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES),
+        field("QTY", "qty", "number"),
+        textarea("Description", "description"),
+        field("Material", "material"),
+        field("Size", "size"),
+        field("Sample (quantity or \"No\")", "sample"),
+        optionalSelect("Urgent", "urgent", ["Yes", "No"], "No"),
+        field("Due date", "dueDate", "date"),
+        React.createElement("div", { className: "field full-span" },
+          React.createElement("label", null, "Photos"),
+          React.createElement("input", { type: "file", name: "photos", accept: "image/*", multiple: true })
+        )
       ),
-      panel("Delivery & Cost",
-        field("Due date", "dueDate", "date", new Date().toISOString().slice(0, 10), true),
-        select("Status", "status", STATUSES),
-        field("Delivery address", "deliveryAddress"),
-        field("Material cost", "materialCost", "number"),
-        field("Labor cost", "laborCost", "number"),
-        field("Other cost", "otherCost", "number"),
-        field("Quoted price", "quotedPrice", "number", "", true),
+      React.createElement("details", { className: "panel collapsible" },
+        React.createElement("summary", null, "Supplier detail"),
+        React.createElement("div", { className: "collapsible-body" },
+          field("Supplier name", "supplierName", "text", "", false, data.suppliers.map(supplier => supplier.name)),
+          field("Material", "supplierMaterial"),
+          field("Size", "supplierSize"),
+          field("QTY", "supplierQty", "number")
+        )
+      ),
+      React.createElement("details", { className: "panel collapsible" },
+        React.createElement("summary", null, "Price detail"),
+        React.createElement("div", { className: "collapsible-body" },
+          React.createElement(PriceDetailFields, {})
+        )
+      ),
+      React.createElement("details", { className: "panel collapsible" },
+        React.createElement("summary", null, "Delivery detail"),
+        React.createElement("div", { className: "collapsible-body" },
+          field("Driver (name or \"Client pick-up\")", "driver"),
+          field("Delivery date & time", "deliveryDatetime", "datetime-local")
+        )
+      ),
+      panel("Remark",
+        textarea("Remark", "remark"),
         React.createElement("button", { className: "btn", type: "submit" }, "Save Work Order")
       )
+    )
+  );
+}
+
+function PriceDetailFields({ initial = {} }) {
+  const [materialCost, setMaterialCost] = useState(initial.materialCost ?? "");
+  const [laborCost, setLaborCost] = useState(initial.laborCost ?? "");
+  const [quotedPrice, setQuotedPrice] = useState(initial.quotedPrice ?? "");
+  const grossProfit = Number(quotedPrice || 0) - Number(materialCost || 0) - Number(laborCost || 0);
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "field" },
+      React.createElement("label", { htmlFor: "materialCost" }, "Mat Cost"),
+      React.createElement("input", { id: "materialCost", name: "materialCost", type: "number", value: materialCost, onChange: event => setMaterialCost(event.target.value) })
+    ),
+    React.createElement("div", { className: "field" },
+      React.createElement("label", { htmlFor: "laborCost" }, "Labour"),
+      React.createElement("input", { id: "laborCost", name: "laborCost", type: "number", value: laborCost, onChange: event => setLaborCost(event.target.value) })
+    ),
+    React.createElement("div", { className: "field" },
+      React.createElement("label", { htmlFor: "quotedPrice" }, "Price quote"),
+      React.createElement("input", { id: "quotedPrice", name: "quotedPrice", type: "number", value: quotedPrice, onChange: event => setQuotedPrice(event.target.value) })
+    ),
+    React.createElement("div", { className: "field" },
+      React.createElement("label", null, "Gross Profit"),
+      React.createElement("div", { className: "computed-value" }, money(grossProfit))
     )
   );
 }
@@ -505,13 +578,20 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
       React.createElement("button", { className: "btn danger", onClick: () => deleteOrder(order.id) }, "Delete")
     ),
     React.createElement("section", { className: "detail-hero" },
-      panel(order.title,
-        React.createElement("p", { className: "subtitle" }, order.description),
+      panel(order.customer,
+        order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
         React.createElement("div", { className: "detail-meta" },
-          React.createElement("span", null, `Customer: ${order.customer}`),
-          React.createElement("span", null, `Type: ${order.workType} - Priority: ${order.priority}`),
-          React.createElement("span", null, `Delivery: ${order.deliveryAddress || "Not set"} - Due ${fmtDate(order.dueDate)}`)
+          order.qty !== "" && React.createElement("span", null, `Qty: ${order.qty}`),
+          order.size && React.createElement("span", null, `Size: ${order.size}`),
+          order.sample && React.createElement("span", null, `Sample: ${order.sample}`),
+          React.createElement("span", null, `Due ${fmtDate(order.dueDate)}`)
         ),
+        order.remark && React.createElement("p", { className: "subtitle" }, `Remark: ${order.remark}`),
+        React.createElement("div", { className: "image-grid" },
+          ...(order.images || []).map(image => React.createElement("img", { key: image.id || image.url, src: image.url, alt: image.fileName || "Job photo" })),
+          !(order.images || []).length && React.createElement("div", { className: "empty" }, "No photos yet")
+        ),
+        React.createElement("input", { type: "file", accept: "image/*", multiple: true, onChange: event => addImages(order.id, event.target.files) }),
         React.createElement("div", { className: "audit-box" },
           React.createElement("span", null, `Created by: ${order.createdByName || order.createdBy || "Unknown"}`),
           React.createElement("span", null, `Modified by: ${order.updatedByName || order.updatedBy || "No modifications yet"}`)
@@ -534,20 +614,45 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
     React.createElement("section", { className: "detail-grid" },
       panel("Edit Work Order",
         React.createElement("form", { className: "module-form compact", onSubmit: event => updateOrder(event, order), key: order.id },
-          field("Customer name", "customer", "text", order.customer, true, data.customers.map(customer => customer.name)),
-          field("Phone", "phone", "tel", order.phone),
-          field("Work title", "title", "text", order.title, true),
-          select("Work type", "workType", WORK_TYPES, order.workType),
-          select("Priority", "priority", PRIORITIES, order.priority),
-          field("Due date", "dueDate", "date", order.dueDate, true),
-          field("Delivery address", "deliveryAddress", "text", order.deliveryAddress),
-          field("Material cost", "materialCost", "number", order.materialCost),
-          field("Labor cost", "laborCost", "number", order.laborCost),
-          field("Other cost", "otherCost", "number", order.otherCost),
-          field("Quoted price", "quotedPrice", "number", order.quotedPrice, true),
+          field("Client name", "customer", "text", order.customer, true, data.customers.map(customer => customer.name)),
+          field("Order date", "orderDate", "date", order.orderDate),
+          optionalSelect("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory),
+          checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES, order.workTypes),
+          field("QTY", "qty", "number", order.qty),
+          field("Material", "material", "text", order.material),
+          field("Size", "size", "text", order.size),
+          field("Sample (quantity or \"No\")", "sample", "text", order.sample),
+          optionalSelect("Urgent", "urgent", ["Yes", "No"], order.urgent ? "Yes" : "No"),
+          field("Due date", "dueDate", "date", order.dueDate),
           React.createElement("div", { className: "field full-span" },
             React.createElement("label", null, "Description"),
-            React.createElement("textarea", { name: "description", defaultValue: order.description, required: true })
+            React.createElement("textarea", { name: "description", defaultValue: order.description })
+          ),
+          React.createElement("div", { className: "field full-span" },
+            React.createElement("label", null, "Remark"),
+            React.createElement("textarea", { name: "remark", defaultValue: order.remark })
+          ),
+          React.createElement("details", { className: "collapsible nested" },
+            React.createElement("summary", null, "Supplier detail"),
+            React.createElement("div", { className: "collapsible-body" },
+              field("Supplier name", "supplierName", "text", order.supplierName, false, data.suppliers.map(supplier => supplier.name)),
+              field("Material", "supplierMaterial", "text", order.supplierMaterial),
+              field("Size", "supplierSize", "text", order.supplierSize),
+              field("QTY", "supplierQty", "number", order.supplierQty)
+            )
+          ),
+          React.createElement("details", { className: "collapsible nested" },
+            React.createElement("summary", null, "Price detail"),
+            React.createElement("div", { className: "collapsible-body" },
+              React.createElement(PriceDetailFields, { initial: order })
+            )
+          ),
+          React.createElement("details", { className: "collapsible nested" },
+            React.createElement("summary", null, "Delivery detail"),
+            React.createElement("div", { className: "collapsible-body" },
+              field("Driver (name or \"Client pick-up\")", "driver", "text", order.driver),
+              field("Delivery date & time", "deliveryDatetime", "datetime-local", order.deliveryDatetime ? order.deliveryDatetime.slice(0, 16) : "")
+            )
           ),
           React.createElement("button", { className: "btn", type: "submit" }, "Update Work Order")
         )
@@ -558,22 +663,6 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
             React.createElement("div", { className: "dot" }),
             React.createElement("div", null, React.createElement("strong", null, item), React.createElement("br"), React.createElement("span", { className: "subtitle" }, index <= currentIndex ? "Completed or active" : "Pending"))
           ))
-        )
-      ),
-      panel("Cost & Profit",
-        React.createElement("div", { className: "detail-meta" },
-          React.createElement("span", null, `Material: ${money(order.materialCost)}`),
-          React.createElement("span", null, `Labor: ${money(order.laborCost)}`),
-          React.createElement("span", null, `Other: ${money(order.otherCost)}`),
-          React.createElement("span", null, `Quoted: ${money(order.quotedPrice)}`),
-          React.createElement("span", { className: "money" }, `Estimated profit: ${money(profit(order))}`)
-        )
-      ),
-      panel("Images",
-        React.createElement("input", { type: "file", accept: "image/*", multiple: true, onChange: event => addImages(order.id, event.target.files) }),
-        React.createElement("div", { className: "image-grid" },
-          ...(order.images || []).map(image => React.createElement("img", { key: image.id || image.url, src: image.url, alt: image.fileName || "Work order" })),
-          !(order.images || []).length && React.createElement("div", { className: "empty" }, "No images yet")
         )
       ),
       panel("History",
@@ -728,6 +817,28 @@ function field(label, name, type = "text", value = "", required = false, suggest
     React.createElement("label", { htmlFor: name }, label),
     React.createElement("input", { id: name, name, type, defaultValue: value, required, list: suggestions.length ? `${name}-list` : undefined }),
     suggestions.length ? React.createElement("datalist", { id: `${name}-list` }, ...suggestions.map(item => React.createElement("option", { key: item, value: item }))) : null
+  );
+}
+
+function optionalSelect(label, name, options, selected = "") {
+  return React.createElement("div", { className: "field" },
+    React.createElement("label", { htmlFor: name }, label),
+    React.createElement("select", { id: name, name, defaultValue: selected },
+      React.createElement("option", { value: "" }, "Not specified"),
+      ...options.map(option => React.createElement("option", { key: option, value: option }, option))
+    )
+  );
+}
+
+function checkboxGroup(label, name, options, selectedValues = []) {
+  return React.createElement("div", { className: "field full-span" },
+    React.createElement("label", null, label),
+    React.createElement("div", { className: "checkbox-group" },
+      ...options.map(option => React.createElement("label", { key: option, className: "checkbox-option" },
+        React.createElement("input", { type: "checkbox", name, value: option, defaultChecked: selectedValues.includes(option) }),
+        React.createElement("span", null, option)
+      ))
+    )
   );
 }
 
