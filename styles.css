@@ -388,7 +388,14 @@ main {
   gap: 2px;
   min-width: 0;
   flex: 1;
-  overflow-wrap: anywhere;
+}
+
+.order-no,
+.card-title,
+.card-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-line {

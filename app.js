@@ -578,13 +578,13 @@ function CreateOrder({ data, createOrder }) {
           React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes" }),
           React.createElement("span", null, "Urgent")
         ),
+        React.createElement(SampleField, {}),
         checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, [], false),
         checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES),
         React.createElement(QtyField, {}),
+        field("Size", "size"),
         textarea("Part Name", "description"),
         field("Material", "material"),
-        field("Size", "size"),
-        React.createElement(SampleField, {}),
         React.createElement("div", { className: "field full-span" },
           React.createElement("label", null, "Photos"),
           React.createElement("input", { type: "file", name: "photos", accept: "image/*", multiple: true })
@@ -712,16 +712,16 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
             React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes", defaultChecked: order.urgent }),
             React.createElement("span", null, "Urgent")
           ),
+          React.createElement(SampleField, { initial: order.sample, key: `sample-${order.id}` }),
           checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory ? [order.jobCategory] : [], false),
           checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES, order.workTypes),
           React.createElement(QtyField, { initial: order.qty, key: `qty-${order.id}` }),
-          field("Material", "material", "text", order.material),
           field("Size", "size", "text", order.size),
-          React.createElement(SampleField, { initial: order.sample, key: `sample-${order.id}` }),
           React.createElement("div", { className: "field full-span" },
             React.createElement("label", null, "Part Name"),
             React.createElement("textarea", { name: "description", defaultValue: order.description })
           ),
+          field("Material", "material", "text", order.material),
           React.createElement("div", { className: "field full-span" },
             React.createElement("label", null, "Remark"),
             React.createElement("textarea", { name: "remark", defaultValue: order.remark })
