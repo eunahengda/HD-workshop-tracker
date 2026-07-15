@@ -273,6 +273,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   min-height: 120px;
+  min-width: 0;
   transition: border-color 0.15s ease, background 0.15s ease;
   touch-action: manipulation;
 }
@@ -285,13 +286,27 @@ main {
 .column-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
   padding: 11px 12px;
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
+}
+
+.column.collapsed .column-head {
+  border-bottom: none;
+}
+
+.collapse-caret {
+  color: var(--muted);
+  font-weight: 900;
+  width: 14px;
+  flex-shrink: 0;
 }
 
 .column-title {
   font-weight: 900;
+  flex: 1;
 }
 
 .count-pill,
@@ -373,6 +388,7 @@ main {
   gap: 2px;
   min-width: 0;
   flex: 1;
+  overflow-wrap: anywhere;
 }
 
 .card-line {

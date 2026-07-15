@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors
 } from "@dnd-kit/core";
+import { exportOrdersToExcel, exportPhotosZip } from "./exporters";
 import {
   JOB_CATEGORIES,
   JOB_WORK_TYPES,
@@ -205,6 +206,8 @@ function App() {
       supplierMaterial: form.get("supplierMaterial"),
       supplierSize: form.get("supplierSize"),
       supplierQty: form.get("supplierQty"),
+      supplierOrderDate: form.get("supplierOrderDate"),
+      supplierDeliveryDate: form.get("supplierDeliveryDate"),
       materialCost: form.get("materialCost"),
       laborCost: form.get("laborCost"),
       quotedPrice: form.get("quotedPrice"),
@@ -247,6 +250,8 @@ function App() {
       supplierMaterial: form.get("supplierMaterial"),
       supplierSize: form.get("supplierSize"),
       supplierQty: form.get("supplierQty"),
+      supplierOrderDate: form.get("supplierOrderDate"),
+      supplierDeliveryDate: form.get("supplierDeliveryDate"),
       materialCost: form.get("materialCost"),
       laborCost: form.get("laborCost"),
       quotedPrice: form.get("quotedPrice"),
@@ -271,6 +276,29 @@ function App() {
     }, "Work order deleted");
   }
 
+  async function handleExportExcel() {
+    try {
+      exportOrdersToExcel(data.orders);
+      showToast("Excel file downloaded");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleExportPhotos() {
+    if (!data.orders.some(order => (order.images || []).length)) {
+      showToast("No photos to download yet");
+      return;
+    }
+    try {
+      showToast("Preparing photo archive...");
+      await exportPhotosZip(data.orders);
+      showToast("Photo archive downloaded");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const common = {
     data,
     page,
@@ -286,7 +314,9 @@ function App() {
     updateStatus,
     deleteOrder,
     refresh,
-    runAction
+    runAction,
+    exportExcel: handleExportExcel,
+    exportPhotos: handleExportPhotos
   };
 
   if (!session) {
@@ -390,6 +420,8 @@ function Dashboard(props) {
       }),
       React.createElement("div", { className: "toolbar-actions" },
         React.createElement("button", { className: "btn secondary", onClick: () => props.refresh() }, "Refresh"),
+        React.createElement("button", { className: "btn secondary", onClick: props.exportExcel }, "Export Excel"),
+        React.createElement("button", { className: "btn secondary", onClick: props.exportPhotos }, "Download Photos"),
         React.createElement("button", { className: "btn", onClick: () => props.setPage("new") }, "New Order")
       )
     ),
@@ -427,37 +459,76 @@ function Kanban({ data, search, moveOrder, setSelectedId, setPage }) {
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 6 } })
   );
-  const query = search.trim().toLowerCase();
-  const orders = data.orders.filter(order => [order.orderNo, order.customer, order.material, order.size, ...(order.workTypes || [])].join(" ").toLowerCase().includes(query));
-
-  return React.createElement(DndContext, {
-    sensors,
-    collisionDetection: closestCenter,
-    onDragEnd: event => {
-      const status = event.over?.id;
-      if (status && STATUSES.includes(status)) moveOrder(event.active.id, status);
+  const [sortKey, setSortKey] = useState("orderDate");
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem("kanbanCollapsed") || "[]");
+    } catch {
+      return [];
     }
-  },
-    React.createElement("section", { className: "kanban" },
-      ...STATUSES.map(status => React.createElement(KanbanColumn, {
-        key: status,
-        status,
-        orders: orders.filter(order => order.status === status),
-        setSelectedId,
-        setPage
-      }))
+  });
+
+  function toggleColumn(status) {
+    setCollapsed(prev => {
+      const next = prev.includes(status) ? prev.filter(item => item !== status) : [...prev, status];
+      try {
+        window.localStorage.setItem("kanbanCollapsed", JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  }
+
+  const query = search.trim().toLowerCase();
+  const sorters = {
+    orderDate: (a, b) => (b.orderDate || "").localeCompare(a.orderDate || ""),
+    customer: (a, b) => a.customer.localeCompare(b.customer)
+  };
+  const orders = data.orders
+    .filter(order => [order.orderNo, order.customer, order.material, order.size, ...(order.workTypes || [])].join(" ").toLowerCase().includes(query))
+    .sort(sorters[sortKey]);
+
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "field sort-control" },
+      React.createElement("label", null, "Sort by"),
+      React.createElement("select", { value: sortKey, onChange: event => setSortKey(event.target.value) },
+        React.createElement("option", { value: "orderDate" }, "Order date"),
+        React.createElement("option", { value: "customer" }, "Company name")
+      )
+    ),
+    React.createElement(DndContext, {
+      sensors,
+      collisionDetection: closestCenter,
+      onDragEnd: event => {
+        const status = event.over?.id;
+        if (status && STATUSES.includes(status)) moveOrder(event.active.id, status);
+      }
+    },
+      React.createElement("section", { className: "kanban" },
+        ...STATUSES.map(status => React.createElement(KanbanColumn, {
+          key: status,
+          status,
+          orders: orders.filter(order => order.status === status),
+          collapsed: collapsed.includes(status),
+          onToggle: () => toggleColumn(status),
+          setSelectedId,
+          setPage
+        }))
+      )
     )
   );
 }
 
-function KanbanColumn({ status, orders, setSelectedId, setPage }) {
+function KanbanColumn({ status, orders, collapsed, onToggle, setSelectedId, setPage }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
-  return React.createElement("article", { ref: setNodeRef, className: `column ${isOver ? "drop-over" : ""}` },
-    React.createElement("div", { className: "column-head" },
+  return React.createElement("article", { ref: setNodeRef, className: `column ${isOver ? "drop-over" : ""} ${collapsed ? "collapsed" : ""}` },
+    React.createElement("div", { className: "column-head", onClick: onToggle, role: "button" },
+      React.createElement("span", { className: "collapse-caret" }, collapsed ? "\u25B8" : "\u25BE"),
       React.createElement("div", { className: "column-title" }, status),
       React.createElement("span", { className: "count-pill" }, orders.length)
     ),
-    React.createElement("div", { className: "cards" },
+    !collapsed && React.createElement("div", { className: "cards" },
       orders.length ? orders.map(order => React.createElement(OrderCard, { key: order.id, order, setSelectedId, setPage })) : React.createElement("div", { className: "empty" }, "Drop orders here")
     )
   );
@@ -503,17 +574,17 @@ function CreateOrder({ data, createOrder }) {
       panel("Job Details",
         field("Client name", "customer", "text", "", true, data.customers.map(customer => customer.name)),
         field("Order date", "orderDate", "date", new Date().toISOString().slice(0, 10)),
-        checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, [], false),
-        checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES),
-        field("QTY", "qty", "number"),
-        textarea("Part Name", "description"),
-        field("Material", "material"),
-        field("Size", "size"),
-        React.createElement(SampleField, {}),
         React.createElement("label", { className: "checkbox-option urgent-check" },
           React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes" }),
           React.createElement("span", null, "Urgent")
         ),
+        checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, [], false),
+        checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES),
+        React.createElement(QtyField, {}),
+        textarea("Part Name", "description"),
+        field("Material", "material"),
+        field("Size", "size"),
+        React.createElement(SampleField, {}),
         React.createElement("div", { className: "field full-span" },
           React.createElement("label", null, "Photos"),
           React.createElement("input", { type: "file", name: "photos", accept: "image/*", multiple: true })
@@ -525,7 +596,9 @@ function CreateOrder({ data, createOrder }) {
           field("Supplier name", "supplierName", "text", "", false, data.suppliers.map(supplier => supplier.name)),
           field("Material", "supplierMaterial"),
           field("Size", "supplierSize"),
-          field("QTY", "supplierQty", "number")
+          field("QTY", "supplierQty", "number"),
+          field("Order date", "supplierOrderDate", "date"),
+          field("Delivery date", "supplierDeliveryDate", "date")
         )
       ),
       React.createElement("details", { className: "panel collapsible" },
@@ -537,8 +610,8 @@ function CreateOrder({ data, createOrder }) {
       React.createElement("details", { className: "panel collapsible" },
         React.createElement("summary", null, "Delivery detail"),
         React.createElement("div", { className: "collapsible-body" },
-          field("Driver (name or \"Client pick-up\")", "driver"),
-          field("Delivery date & time", "deliveryDatetime", "datetime-local")
+          checkboxGroup("Driver", "driver", ["H&D", "Self Pick-Up"], [], false),
+          field("Delivery date", "deliveryDatetime", "date")
         )
       ),
       React.createElement("details", { className: "panel collapsible" },
@@ -635,16 +708,16 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
         React.createElement("form", { className: "module-form compact", onSubmit: event => updateOrder(event, order), key: order.id },
           field("Client name", "customer", "text", order.customer, true, data.customers.map(customer => customer.name)),
           field("Order date", "orderDate", "date", order.orderDate),
-          checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory ? [order.jobCategory] : [], false),
-          checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES, order.workTypes),
-          field("QTY", "qty", "number", order.qty),
-          field("Material", "material", "text", order.material),
-          field("Size", "size", "text", order.size),
-          React.createElement(SampleField, { initial: order.sample, key: `sample-${order.id}` }),
           React.createElement("label", { className: "checkbox-option urgent-check" },
             React.createElement("input", { type: "checkbox", name: "urgent", value: "Yes", defaultChecked: order.urgent }),
             React.createElement("span", null, "Urgent")
           ),
+          checkboxGroup("Repair / Make", "jobCategory", JOB_CATEGORIES, order.jobCategory ? [order.jobCategory] : [], false),
+          checkboxGroup("Work type (select any that apply)", "workTypes", JOB_WORK_TYPES, order.workTypes),
+          React.createElement(QtyField, { initial: order.qty, key: `qty-${order.id}` }),
+          field("Material", "material", "text", order.material),
+          field("Size", "size", "text", order.size),
+          React.createElement(SampleField, { initial: order.sample, key: `sample-${order.id}` }),
           React.createElement("div", { className: "field full-span" },
             React.createElement("label", null, "Part Name"),
             React.createElement("textarea", { name: "description", defaultValue: order.description })
@@ -659,7 +732,9 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
               field("Supplier name", "supplierName", "text", order.supplierName, false, data.suppliers.map(supplier => supplier.name)),
               field("Material", "supplierMaterial", "text", order.supplierMaterial),
               field("Size", "supplierSize", "text", order.supplierSize),
-              field("QTY", "supplierQty", "number", order.supplierQty)
+              field("QTY", "supplierQty", "number", order.supplierQty),
+              field("Order date", "supplierOrderDate", "date", order.supplierOrderDate),
+              field("Delivery date", "supplierDeliveryDate", "date", order.supplierDeliveryDate)
             )
           ),
           React.createElement("details", { className: "collapsible nested" },
@@ -671,8 +746,8 @@ function Detail({ data, selectedId, setPage, addImages, updateStatus, updateOrde
           React.createElement("details", { className: "collapsible nested" },
             React.createElement("summary", null, "Delivery detail"),
             React.createElement("div", { className: "collapsible-body" },
-              field("Driver (name or \"Client pick-up\")", "driver", "text", order.driver),
-              field("Delivery date & time", "deliveryDatetime", "datetime-local", order.deliveryDatetime ? order.deliveryDatetime.slice(0, 16) : "")
+              checkboxGroup("Driver", "driver", ["H&D", "Self Pick-Up"], order.driver ? [order.driver] : [], false),
+              field("Delivery date", "deliveryDatetime", "date", order.deliveryDatetime ? order.deliveryDatetime.slice(0, 10) : "")
             )
           ),
           React.createElement("details", { className: "collapsible nested" },
@@ -908,6 +983,37 @@ function checkboxGroup(label, name, options, selectedValues = [], multiple = tru
         React.createElement("span", null, option)
       ))
     )
+  );
+}
+
+const QTY_QUICK_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10];
+
+function QtyField({ initial = "" }) {
+  const isQuick = QTY_QUICK_OPTIONS.includes(Number(initial));
+  const [mode, setMode] = useState(initial === "" || isQuick ? "quick" : "custom");
+  const [value, setValue] = useState(initial === "" ? "" : String(initial));
+  return React.createElement("div", { className: "field" },
+    React.createElement("label", null, "QTY"),
+    React.createElement("div", { className: "checkbox-group" },
+      ...QTY_QUICK_OPTIONS.map(option => React.createElement("label", { key: option, className: `checkbox-option ${mode === "quick" && Number(value) === option ? "active" : ""}` },
+        React.createElement("input", {
+          type: "radio",
+          name: "qtyQuick",
+          checked: mode === "quick" && Number(value) === option,
+          onChange: () => { setMode("quick"); setValue(String(option)); }
+        }),
+        React.createElement("span", null, option)
+      )),
+      React.createElement("input", {
+        type: "number",
+        min: "0",
+        placeholder: "Other",
+        value: mode === "custom" ? value : "",
+        onFocus: () => setMode("custom"),
+        onChange: event => { setValue(event.target.value); setMode("custom"); }
+      })
+    ),
+    React.createElement("input", { type: "hidden", name: "qty", value, readOnly: true })
   );
 }
 
