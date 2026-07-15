@@ -364,33 +364,36 @@ main {
 .card-row {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 10px;
 }
 
 .card-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
-.card-qty {
-  font-weight: 700;
-  color: var(--ink);
+.card-line {
   font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 700;
 }
 
-.card-meta-left {
+.card-side {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  align-items: flex-start;
+  align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .card-date {
   color: var(--muted);
   font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 .sort-control {
@@ -731,8 +734,7 @@ details.collapsible.nested {
   }
 
   .kanban {
-    grid-template-columns: repeat(5, minmax(220px, 1fr));
-    overflow-x: auto;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .two-col,

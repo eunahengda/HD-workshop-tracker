@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   DndContext,
@@ -47,6 +47,11 @@ function App() {
   const [error, setError] = useState("");
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const sessionRef = useRef(null);
+  function updateSession(next) {
+    sessionRef.current = next;
+    setSession(next);
+  }
 
   async function refresh(silent = false) {
     if (!isSupabaseConfigured) {
@@ -54,7 +59,7 @@ function App() {
       setLoading(false);
       return;
     }
-    if (!session) {
+    if (!sessionRef.current) {
       setData(emptyData);
       setLoading(false);
       return;
@@ -79,7 +84,7 @@ function App() {
     }
     let unsubscribeRealtime = () => {};
     authApi.getSession().then(async currentSession => {
-      setSession(currentSession);
+      updateSession(currentSession);
       if (currentSession) {
         setProfile(await authApi.getProfile());
         await refresh();
@@ -92,7 +97,7 @@ function App() {
       setLoading(false);
     });
     const unsubscribeAuth = authApi.onAuthStateChange(async nextSession => {
-      setSession(nextSession);
+      updateSession(nextSession);
       setProfile(nextSession ? await authApi.getProfile() : null);
       if (nextSession) {
         await refresh();
@@ -131,7 +136,7 @@ function App() {
     const form = new FormData(event.currentTarget);
     await runAction(async () => {
       const nextSession = await authApi.signIn(form.get("email"), form.get("password"));
-      setSession(nextSession);
+      updateSession(nextSession);
       setProfile(await authApi.getProfile());
     }, "Signed in");
   }
@@ -146,7 +151,7 @@ function App() {
         fullName: form.get("fullName"),
         role: form.get("role")
       });
-      setSession(nextSession);
+      updateSession(nextSession);
       if (nextSession) {
         setProfile(await authApi.getProfile());
         showToast("Account created");
@@ -160,7 +165,7 @@ function App() {
 
   async function handleSignOut() {
     await authApi.signOut();
-    setSession(null);
+    updateSession(null);
     setProfile(null);
     setData(emptyData);
     showToast("Signed out");
@@ -476,15 +481,14 @@ function OrderCard({ order, setSelectedId, setPage }) {
     ...attributes
   },
     React.createElement("div", { className: "card-row" },
+      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" }),
       React.createElement("div", { className: "card-info" },
         React.createElement("div", { className: "order-no" }, order.orderNo),
         React.createElement("div", { className: "card-title" }, order.customer),
-        order.qty !== "" && React.createElement("div", { className: "card-qty" }, `Qty: ${order.qty}`)
+        order.size && React.createElement("div", { className: "card-line" }, order.size),
+        order.qty !== "" && React.createElement("div", { className: "card-line" }, `${order.qty}pc`)
       ),
-      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" })
-    ),
-    React.createElement("div", { className: "card-meta" },
-      React.createElement("div", { className: "card-meta-left" },
+      React.createElement("div", { className: "card-side" },
         order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
         order.orderDate && React.createElement("span", { className: "card-date" }, fmtDate(order.orderDate))
       )
