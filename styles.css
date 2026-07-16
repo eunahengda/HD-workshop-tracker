@@ -412,7 +412,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-shrink: 0;
 }
 

@@ -552,16 +552,16 @@ function OrderCard({ order, setSelectedId, setPage }) {
     ...attributes
   },
     React.createElement("div", { className: "card-row" },
-      thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" }),
+      React.createElement("div", { className: "card-side" },
+        order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
+        order.orderDate && React.createElement("span", { className: "card-date" }, fmtDateShort(order.orderDate)),
+        thumbnail && React.createElement("img", { className: "card-thumb", src: thumbnail.url, alt: thumbnail.fileName || "Job photo" })
+      ),
       React.createElement("div", { className: "card-info" },
         React.createElement("div", { className: "order-no" }, order.orderNo),
         React.createElement("div", { className: "card-title" }, order.customer),
-        order.size && React.createElement("div", { className: "card-line" }, order.size),
-        order.qty !== "" && React.createElement("div", { className: "card-line" }, `${order.qty}pc`)
-      ),
-      React.createElement("div", { className: "card-side" },
-        order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
-        order.orderDate && React.createElement("span", { className: "card-date" }, fmtDateShort(order.orderDate))
+        order.qty !== "" && React.createElement("div", { className: "card-line" }, `${order.qty}pc`),
+        order.size && React.createElement("div", { className: "card-line" }, order.size)
       )
     )
   );
