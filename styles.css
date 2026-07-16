@@ -414,7 +414,6 @@ main {
   gap: 4px;
   align-items: flex-end;
   flex-shrink: 0;
-  max-width: 90px;
 }
 
 .card-date {
@@ -430,10 +429,10 @@ main {
 }
 
 .card-thumb {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   flex-shrink: 0;
 }

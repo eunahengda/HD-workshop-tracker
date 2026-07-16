@@ -561,7 +561,7 @@ function OrderCard({ order, setSelectedId, setPage }) {
       ),
       React.createElement("div", { className: "card-side" },
         order.urgent && React.createElement("span", { className: "status-pill urgent-pill" }, "Urgent"),
-        order.orderDate && React.createElement("span", { className: "card-date" }, fmtDate(order.orderDate))
+        order.orderDate && React.createElement("span", { className: "card-date" }, fmtDateShort(order.orderDate))
       )
     )
   );
@@ -1071,6 +1071,14 @@ function dateOnly(value) {
 function fmtDate(value) {
   if (!value) return "No date";
   return new Intl.DateTimeFormat("en-MY", { day: "2-digit", month: "short", year: "numeric" }).format(dateOnly(value));
+}
+
+function fmtDateShort(value) {
+  if (!value) return "";
+  const date = dateOnly(value);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}`;
 }
 
 function profit(order) {
