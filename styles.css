@@ -332,9 +332,11 @@ main {
   border: 1px solid var(--line);
   border-left: 4px solid var(--brand);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   color: inherit;
   box-shadow: 0 4px 14px rgba(28, 36, 48, 0.06);
+  overflow: hidden;
+  max-width: 100%;
   touch-action: none;
   user-select: none;
 }
@@ -379,7 +381,8 @@ main {
 .card-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .card-info {
@@ -387,7 +390,7 @@ main {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 0%;
 }
 
 .order-no,
@@ -396,10 +399,11 @@ main {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .card-line {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   color: var(--muted);
   font-weight: 700;
 }
@@ -410,12 +414,13 @@ main {
   gap: 4px;
   align-items: flex-end;
   flex-shrink: 0;
+  max-width: 90px;
 }
 
 .card-date {
   color: var(--muted);
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.7rem;
   white-space: nowrap;
 }
 
@@ -425,10 +430,10 @@ main {
 }
 
 .card-thumb {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--line);
   flex-shrink: 0;
 }
@@ -529,13 +534,14 @@ details.collapsible.nested {
 
 .order-no {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
 .card-title {
   margin-top: 4px;
   font-weight: 900;
+  font-size: 0.9rem;
 }
 
 .card-meta,
